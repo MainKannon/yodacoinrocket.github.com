@@ -1,0 +1,28 @@
+.wallet-connection {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+#connectWalletButton {
+  padding: 10px 20px;
+  background: #2ff924;
+  color: #000;
+  border: none;
+  border-radius: 5px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+#connectWalletButton:hover {
+  background: #2a9d8f;
+}
+
+.hidden {
+  display: none;
+}
+
+#connectedWallet {
+  margin-top: 10px;
+  color: #a8dadc;
+}

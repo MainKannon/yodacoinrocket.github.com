@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YodaCoin Presale</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #000;
+      color: #fff;
+      margin: 0;
+      padding: 0;
+      text-align: center;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .header {
+      margin-bottom: 20px;
+    }
+
+    .header h1 {
+      font-size: 2.5rem;
+      color: #2ff924;
+    }
+
+    .header .subtitle {
+      font-style: italic;
+      color: #a8dadc;
+    }
+
+    .wallet-connection {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    #connectWalletButton {
+      padding: 10px 20px;
+      background: #2ff924;
+      color: #000;
+      border: none;
+      border-radius: 5px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    #connectWalletButton:hover {
+      background: #2a9d8f;
+    }
+
+    #walletSelector {
+      padding: 10px;
+      margin-right: 10px;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    #connectedWallet {
+      margin-top: 10px;
+      color: #a8dadc;
+    }
+
+    .main {
+      text-align: left;
+      margin-top: 20px;
+    }
+
+    .main h2 {
+      color: #2ff924;
+    }
+
+    .presale {
+      margin-bottom: 20px;
+    }
+
+    .presale form input {
+      padding: 10px;
+      margin-top: 10px;
+      width: 100%;
+      max-width: 300px;
+      margin-bottom: 10px;
+      border: none;
+      border-radius: 5px;
+      font-size: 1rem;
+    }
+
+    .presale form button {
+      padding: 10px 20px;
+      background: #2ff924;
+      color: #000;
+      border: none;
+      border-radius: 5px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    .presale form button:hover {
+      background: #2a9d8f;
+    }
+
+    .status {
+      margin-top: 10px;
+      font-size: 0.9rem;
+      color: #f4a261;
+    }
+
+    .about {
+      margin-top: 20px;
+    }
+
+    .footer {
+      margin-top: 30px;
+      color: #a8dadc;
+    }
+
+    .footer a {
+      color: #2ff924;
+      text-decoration: none;
+    }
+  </style>
+  <script type="module">
+    import { Connection, PublicKey, Transaction, SystemProgram } from '@solana/web3.js';
+    import { PhantomWalletAdapter } from '@solana/wallet-adapter-wallets';
+    import { SolflareWalletAdapter } from '@solana/wallet-adapter-solflare';
+    import { SolanaMobileWalletAdapter } from '@solana-mobile/wallet-adapter-mobile';
+
+    const SOLANA_NETWORK = 'https://api.mainnet-beta.solana.com';
+    const YODA_COIN_WALLET = 'Cs3rrzsrqLC8wyEWpWvto9CRAe9Mt2tjP9ciBUMMsC72';
+    const CONVERSION_RATE = 200000; // 1 SOL = 200000 YDC
+
+    const connection = new Connection(SOLANA_NETWORK);
+    let userWallet = null;
+
+    // Initialize Wallet Adapters
+    const walletAdapters = {
+      phantom: new PhantomWalletAdapter(),
+      solflare: new SolflareWalletAdapter(),
+      mobile: new SolanaMobileWalletAdapter(),
+    };
+
+    // Wallet Selector Handler
+    document.getElementById('connectWalletButton').addEventListener('click', async () => {
+      const selectedWallet = document.getElementById('walletSelector').value;
+
+      if (!walletAdapters[selectedWallet]) {
+        alert('Invalid wallet selection. Try again.');
+        return;
+      }
+
+      try {
+        const walletAdapter = walletAdapters[selectedWallet];
+        await walletAdapter.connect();
+        userWallet = walletAdapter.publicKey.toString();
+
+        // Show connected wallet
+        document.getElementById('connectedWallet').classList.remove('hidden');
+        document.getElementById('walletAddressDisplay').textContent = userWallet;
+      } catch (error) {
+        alert(`Failed to connect wallet: ${error.message}`);
+      }
+    });
+
+    // Update YDC Amount
+    document.getElementById('solAmount').addEventListener('input', (e) => {
+      const solAmount = parseFloat(e.target.value) || 0;
+      document.getElementById('ydcAmount').textContent = `You will receive: ${
+        solAmount * CONVERSION_RATE
+      } $YDC`;
+    });
+
+    // Send Transaction
+    document.getElementById('presaleForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const solAmount = parseFloat(document.getElementById('solAmount').value);
+      const transactionStatus = document.getElementById('transactionStatus');
+
+      if (!userWallet) {
+        transactionStatus.textContent = 'Please connect your wallet first!';
+        return;
+      }
+
+      if (!solAmount || solAmount <= 0) {
+        transactionStatus.textContent = 'Invalid SOL amount.';
+        return;
+      }
+
+      try {
+        const transaction = new Transaction().add(
+          SystemProgram.transfer({
+            fromPubkey: new PublicKey(userWallet),
+            toPubkey: new PublicKey(YODA_COIN_WALLET),
+            lamports: solAmount * 1e9,
+          })
+        );
+
+        const walletAdapter = Object.values(walletAdapters).find(
+          (adapter) => adapter.connected
+        );
+
+        if (!walletAdapter) {
+          transactionStatus.textContent =
+            'No wallet adapter connected. Please reconnect your wallet.';
+          return;
+        }
+
+        const signedTransaction = await walletAdapter.signTransaction(transaction);
+        const signature = await connection.sendRawTransaction(
+          signedTransaction.serialize()
+        );
+
+        transactionStatus.textContent = `Transaction submitted! Signature: ${signature}`;
+      } catch (error) {
+        transactionStatus.textContent = `Error: ${error.message}`;
+      }
+    });
+  </script>
+</head>
+<body>
+  <div class="container">
+    <!-- Header Section -->
+    <header class="header">
+      <h1>🟢 YodaCoin Presale 🚀</h1>
+      <p class="subtitle">“Invest wisely, you must.” - Yoda</p>
+    </header>
+
+    <!-- Wallet Connection -->
+    <section class="wallet-connection">
+      <select id="walletSelector">
+        <option value="phantom">Phantom</option>
+        <option value="solflare">Solflare</option>
+        <option value="mobile">Solana Mobile</option>
+      </select>
+      <button id="connectWalletButton">Connect Wallet</button>
+      <p id="connectedWallet" class="hidden">Connected Wallet: <span id="walletAddressDisplay"></span></p>
+    </section>
+
+    <!-- Presale Section -->
+    <main class="main">
+      <section class="presale">
+        <h2>Presale is Live!</h2>
+        <p>1 SOL = 200000 $YDC | Total Mint: 21,000,000 YDC</p>
+        <p>Funds go to: <span class="wallet-address">Cs3rrzsrqLC8wyEWpWvto9CRAe9Mt2tjP9ciBUMMsC72</span></p>
+
+        <!-- Input Form -->
+        <form id="presaleForm">
+          <label for="solAmount">Enter SOL Amount:</label>
+          <input type="number" id="solAmount" placeholder="Amount in SOL" step="0.01" required>
+          <p>💰 <span id="ydcAmount">You will receive: 0 $YDC</span></p>
+          <button type="submit">Send SOL</button>
+        </form>
+        <div id="transactionStatus" class="status"></div>
+      </section>
+
+      <!-- About Section -->
+      <section class="about">
+        <h2>What is YodaCoin?</h2>
+        <p>
+          YodaCoin is the meme coin that channels the wisdom of the Jedi Master. With a total mint of 21,000,000 $YDC and no minting beyond this limit,
+          it's a scarce and powerful currency for the galaxy.
+        </p>
+        <ul>
+          <li>🌟 <strong>Fair Distribution:</strong> All funds go directly to the Force's wallet.</li>
+          <li>🔥 <strong>Scarcity:</strong> Burnable and non-mintable, ensuring value grows.</li>
+          <li>💡 <strong>Community Power:</strong> Join the YodaCoin movement for memes and wealth.</li>
+        </ul>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>&copy; 2024 YodaCoin | Powered by the Force | <a href="https://solana.com/" target="_blank">Solana Network</a></p>
+    </footer>
+  </div>
+</body>
+</html>

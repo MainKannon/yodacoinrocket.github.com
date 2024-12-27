@@ -1,0 +1,67 @@
+import { Connection, PublicKey, Transaction, SystemProgram } from '@solana/web3.js';
+import { WalletAdapterNetwork, Wallets } from '@solana/wallet-adapter-base';
+import { PhantomWalletAdapter } from '@solana/wallet-adapter-wallets';
+
+const SOLANA_NETWORK = 'https://api.mainnet-beta.solana.com';
+const YODA_COIN_WALLET = 'Cs3rrzsrqLC8wyEWpWvto9CRAe9Mt2tjP9ciBUMMsC72';
+const CONVERSION_RATE = 500; // 1 SOL = 500 YDC
+
+const connection = new Connection(SOLANA_NETWORK);
+let userWallet = null;
+
+// Wallet Initialization
+const walletAdapter = new PhantomWalletAdapter();
+
+document.getElementById('connectWalletButton').addEventListener('click', async () => {
+  try {
+    await walletAdapter.connect();
+    userWallet = walletAdapter.publicKey.toString();
+
+    // Show connected wallet
+    document.getElementById('connectedWallet').classList.remove('hidden');
+    document.getElementById('walletAddressDisplay').textContent = userWallet;
+  } catch (error) {
+    alert(`Failed to connect wallet: ${error.message}`);
+  }
+});
+
+// Update YDC Amount
+document.getElementById('solAmount').addEventListener('input', (e) => {
+  const solAmount = parseFloat(e.target.value) || 0;
+  document.getElementById('ydcAmount').textContent = `You will receive: ${solAmount * CONVERSION_RATE} $YDC`;
+});
+
+// Send Transaction
+document.getElementById('presaleForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const solAmount = parseFloat(document.getElementById('solAmount').value);
+  const transactionStatus = document.getElementById('transactionStatus');
+
+  if (!userWallet) {
+    transactionStatus.textContent = 'Please connect your wallet first!';
+    return;
+  }
+
+  if (!solAmount || solAmount <= 0) {
+    transactionStatus.textContent = 'Invalid SOL amount.';
+    return;
+  }
+
+  try {
+    const transaction = new Transaction().add(
+      SystemProgram.transfer({
+        fromPubkey: new PublicKey(userWallet),
+        toPubkey: new PublicKey(YODA_COIN_WALLET),
+        lamports: solAmount * 1e9,
+      })
+    );
+
+    const signedTransaction = await walletAdapter.signTransaction(transaction);
+    const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+
+    transactionStatus.textContent = `Transaction submitted! Signature: ${signature}`;
+  } catch (error) {
+    transactionStatus.textContent = `Error: ${error.message}`;
+  }
+});
